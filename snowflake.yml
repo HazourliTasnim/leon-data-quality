@@ -1,0 +1,16 @@
+definition_version: 2
+entities:
+  brother_dq_app:
+    type: streamlit
+    identifier:
+      name: BROTHER_DQ_APP
+      schema: DATA_QUALITY
+    title: "Qualitix - Data Quality Platform"
+    query_warehouse: COMPUTE_WH
+    main_file: app.py
+    pages_dir: None
+    stage: BROTHER_DQ.DATA_QUALITY.BROTHER_DQ_STAGE
+    artifacts:
+      - app.py
+      - environment.yml
+      - .streamlit/config.toml

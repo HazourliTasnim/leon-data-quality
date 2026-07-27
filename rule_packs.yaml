@@ -1,0 +1,486 @@
+# Rule Packs Configuration
+# Predefined data quality rules for known source systems and entity types
+
+rule_packs:
+  # SAP SD (Sales & Distribution)
+  - source_system: "SAP_SD"
+    entity_type: "SalesOrderHeader"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "*document*number*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Document number is mandatory in SAP SD"
+      - applies_to: "*document*number*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Document number must be unique"
+      - applies_to: "*order*date*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Order date is required"
+      - applies_to: "*order*date*"
+        type: "MAX_AGE_DAYS"
+        severity: "WARNING"
+        params:
+          max_days: 730
+        description: "Orders older than 2 years should be reviewed"
+      - applies_to: "*value*|*amount*"
+        type: "MIN_VALUE"
+        severity: "CRITICAL"
+        params:
+          min_value: 0
+        description: "Order values cannot be negative"
+      - applies_to: "*customer*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Customer ID is mandatory"
+
+  - source_system: "SAP_SD"
+    entity_type: "SalesOrderLine"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "*item*number*|*line*number*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Line item number is required"
+      - applies_to: "*quantity*"
+        type: "MIN_VALUE"
+        severity: "CRITICAL"
+        params:
+          min_value: 0
+        description: "Quantity must be positive"
+      - applies_to: "*product*id*|*material*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Product/material ID is mandatory"
+
+  # Salesforce
+  - source_system: "SFDC"
+    entity_type: "Account"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "id"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Salesforce ID is required"
+      - applies_to: "id"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Salesforce ID must be unique"
+      - applies_to: "*name*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Account name is mandatory"
+      - applies_to: "*created*date*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Created date should be populated"
+
+  - source_system: "SFDC"
+    entity_type: "Opportunity"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "id"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Opportunity ID is required"
+      - applies_to: "*amount*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Opportunity amount should not be negative"
+      - applies_to: "*stage*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Sales stage is mandatory"
+      - applies_to: "*account*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Account ID is required"
+
+  # NetSuite
+  - source_system: "NETSUITE"
+    entity_type: "Customer"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "*customer*id*|*entity*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Customer ID is mandatory"
+      - applies_to: "*customer*id*|*entity*id*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Customer ID must be unique"
+      - applies_to: "*name*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Customer name is required"
+      - applies_to: "*email*"
+        type: "PATTERN"
+        severity: "WARNING"
+        params:
+          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        description: "Email must be valid format"
+
+  - source_system: "NETSUITE"
+    entity_type: "Invoice"
+    business_domain: "Finance"
+    rules:
+      - applies_to: "*invoice*number*|*doc*number*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Invoice number is mandatory"
+      - applies_to: "*invoice*number*|*doc*number*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Invoice number must be unique"
+      - applies_to: "*total*|*amount*"
+        type: "MIN_VALUE"
+        severity: "CRITICAL"
+        params:
+          min_value: 0
+        description: "Invoice total cannot be negative"
+      - applies_to: "*date*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Invoice date is required"
+
+  # SAP C4C (Cloud for Customer)
+  - source_system: "SAP_C4C"
+    entity_type: "C4C_Account"
+    business_domain: "CRM"
+    rules:
+      - applies_to: "account_id|*account*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Account ID is mandatory in C4C"
+      - applies_to: "account_id|*account*id*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Account ID must be unique"
+      - applies_to: "country_code|*country*"
+        type: "MAX_LENGTH"
+        severity: "WARNING"
+        params:
+          max_length: 2
+        description: "Country code should be 2 characters"
+      - applies_to: "*status*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Account status should be populated"
+
+  - source_system: "SAP_C4C"
+    entity_type: "C4C_Opportunity"
+    business_domain: "CRM"
+    rules:
+      - applies_to: "*opportunity*id*|*opp*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Opportunity ID is required"
+      - applies_to: "*opportunity*id*|*opp*id*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Opportunity ID must be unique"
+      - applies_to: "*revenue*|*amount*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Expected revenue should be positive"
+      - applies_to: "*probability*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Probability must be between 0 and 100"
+      - applies_to: "*probability*"
+        type: "MAX_VALUE"
+        severity: "WARNING"
+        params:
+          max_value: 100
+        description: "Probability must be between 0 and 100"
+
+  - source_system: "SAP_C4C"
+    entity_type: "C4C_Contact"
+    business_domain: "CRM"
+    rules:
+      - applies_to: "*contact*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Contact ID is required"
+      - applies_to: "*email*"
+        type: "PATTERN"
+        severity: "WARNING"
+        params:
+          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        description: "Email must be valid format"
+
+  # SAP APO (Advanced Planning & Optimizer)
+  - source_system: "SAP_APO"
+    entity_type: "APO_Product"
+    business_domain: "SupplyChain"
+    rules:
+      - applies_to: "product_id|*product*id*|*material*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Product ID is mandatory"
+      - applies_to: "product_id|*product*id*|*material*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Product ID must be unique"
+      - applies_to: "safety_stock|*safety*stock*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Safety stock cannot be negative"
+      - applies_to: "*lead*time*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Lead time must be non-negative"
+
+  - source_system: "SAP_APO"
+    entity_type: "APO_SalesForecast"
+    business_domain: "SupplyChain"
+    rules:
+      - applies_to: "*forecast*quantity*|*demand*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Forecast quantity should be non-negative"
+      - applies_to: "*forecast*date*|*period*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Forecast period is required"
+      - applies_to: "product_id|*product*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Product ID is required for forecast"
+
+  - source_system: "SAP_APO"
+    entity_type: "APO_LocationProduct"
+    business_domain: "SupplyChain"
+    rules:
+      - applies_to: "location*|*plant*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Location is mandatory"
+      - applies_to: "product_id|*product*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Product ID is mandatory"
+      - applies_to: "*lot*size*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 1
+        description: "Lot size must be at least 1"
+      - applies_to: "*stock*|*inventory*"
+        type: "MIN_VALUE"
+        severity: "INFO"
+        params:
+          min_value: 0
+        description: "Stock levels should be non-negative"
+
+  # SAP MM (Materials Management)
+  - source_system: "SAP_MM"
+    entity_type: "PurchaseOrderHeader"
+    business_domain: "Procurement"
+    rules:
+      - applies_to: "*po*number*|*purchase*order*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "PO number is mandatory"
+      - applies_to: "*po*number*|*purchase*order*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "PO number must be unique"
+      - applies_to: "*vendor*id*|*supplier*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Vendor ID is required"
+
+  - source_system: "SAP_MM"
+    entity_type: "GoodsReceipt"
+    business_domain: "Procurement"
+    rules:
+      - applies_to: "*receipt*number*|*gr*number*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Goods receipt number is required"
+      - applies_to: "*quantity*"
+        type: "MIN_VALUE"
+        severity: "CRITICAL"
+        params:
+          min_value: 0
+        description: "Receipt quantity must be positive"
+
+  # SAP FI (Financial Accounting)
+  - source_system: "SAP_FI"
+    entity_type: "GLHeader"
+    business_domain: "Finance"
+    rules:
+      - applies_to: "*document*number*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "GL document number is mandatory"
+      - applies_to: "*document*number*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "GL document number must be unique"
+      - applies_to: "*posting*date*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Posting date is required"
+
+  # SAP CO (Controlling)
+  - source_system: "SAP_CO"
+    entity_type: "GLHeader"
+    business_domain: "Finance"
+    rules:
+      - applies_to: "*cost*center*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Cost center should be assigned"
+      - applies_to: "*amount*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Amount is required"
+
+  # Shopify (Ecommerce)
+  - source_system: "SHOPIFY"
+    entity_type: "WebOrder"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "*order*id*|*order*number*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Order ID is mandatory"
+      - applies_to: "*order*id*|*order*number*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Order ID must be unique"
+      - applies_to: "*total*|*amount*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Order total should be positive"
+      - applies_to: "*status*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Order status should be set"
+
+  # Magento (Ecommerce)
+  - source_system: "MAGENTO"
+    entity_type: "ProductCatalog"
+    business_domain: "Sales"
+    rules:
+      - applies_to: "sku|*sku*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "SKU is mandatory"
+      - applies_to: "sku|*sku*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "SKU must be unique"
+      - applies_to: "*price*"
+        type: "MIN_VALUE"
+        severity: "WARNING"
+        params:
+          min_value: 0
+        description: "Product price should be positive"
+      - applies_to: "*status*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Product status should be set"
+
+  # Dynamics 365
+  - source_system: "DYNAMICS_365"
+    entity_type: "Account"
+    business_domain: "CRM"
+    rules:
+      - applies_to: "accountid|*account*id*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Account ID is required"
+      - applies_to: "accountid|*account*id*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Account ID must be unique"
+      - applies_to: "*name*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Account name is mandatory"
+
+  # Oracle EBS
+  - source_system: "ORACLE_EBS"
+    entity_type: "InvoiceHeader"
+    business_domain: "Finance"
+    rules:
+      - applies_to: "*invoice*id*|*invoice*num*"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Invoice ID is required"
+      - applies_to: "*invoice*id*|*invoice*num*"
+        type: "UNIQUE"
+        severity: "CRITICAL"
+        description: "Invoice ID must be unique"
+      - applies_to: "*total*|*amount*"
+        type: "MIN_VALUE"
+        severity: "CRITICAL"
+        params:
+          min_value: 0
+        description: "Invoice amount cannot be negative"
+
+  # Generic rules for common patterns
+  - source_system: "GENERIC"
+    entity_type: "GENERIC"
+    business_domain: "GENERIC"
+    rules:
+      - applies_to: "*_id"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "ID fields should not be null"
+      - applies_to: "*_key"
+        type: "NOT_NULL"
+        severity: "CRITICAL"
+        description: "Key fields should not be null"
+      - applies_to: "*created*|*inserted*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Audit timestamps should be populated"
+      - applies_to: "*status*"
+        type: "NOT_NULL"
+        severity: "WARNING"
+        description: "Status fields should have values"
+      - applies_to: "*email*"
+        type: "PATTERN"
+        severity: "WARNING"
+        params:
+          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        description: "Email must be valid format"
+
+# Entity type suggestions for common table patterns
+entity_type_suggestions:
+  - patterns: ["*order*header*", "*sales*order*", "*purchase*order*"]
+    entity_type: "OrderHeader"
+  - patterns: ["*order*line*", "*order*item*", "*order*detail*"]
+    entity_type: "OrderLine"
+  - patterns: ["*customer*", "*account*"]
+    entity_type: "Customer"
+  - patterns: ["*product*", "*item*", "*material*"]
+    entity_type: "Product"
+  - patterns: ["*invoice*"]
+    entity_type: "Invoice"
+  - patterns: ["*payment*"]
+    entity_type: "Payment"
+  - patterns: ["*employee*", "*person*"]
+    entity_type: "Person"
+  - patterns: ["*transaction*"]
+    entity_type: "Transaction"
