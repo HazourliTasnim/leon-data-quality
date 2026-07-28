@@ -1,4 +1,4 @@
-"""Leon — Data Quality Platform."""
+﻿"""Leon — Data Quality Platform."""
 
 import html
 import io
@@ -2705,7 +2705,19 @@ def get_fr_anomalies():
 
 
 def get_fr_corrections():
-    return st.session_state.get("fr_corrections", [])
+    # First check session state
+    _session_corr = st.session_state.get("fr_corrections", [])
+    if _session_corr:
+        return _session_corr
+    # Fallback: load from database
+    try:
+        df = _sf_query("SELECT * FROM QUALITY_TEST.DATA_QUALITY.DQ_CORRECTIONS WHERE action = 'Accepted' ORDER BY created_at DESC")
+        if not df.empty:
+            df.columns = [c.lower() for c in df.columns]
+            return df.to_dict("records")
+    except Exception:
+        pass
+    return []
 
 
 def fr_resolve_anomaly(anomaly_id: str, action: str, rejection_reason: str = "", corrected_value: str = ""):
@@ -4388,133 +4400,120 @@ def render_sidebar():
     findings = get_findings()
     open_findings = sum(1 for f in findings if f["status"] == "Open")
     open_tasks = sum(1 for f in findings if f["status"] in ("Open", "In Review"))
-    open_fr = sum(1 for a in get_all_fr_anomalies() if a["status"] in ("Open", "In Review"))
+    _fr_anomalies = get_all_fr_anomalies()
+    fr_count = len(_fr_anomalies)
 
     with st.sidebar:
-        st.markdown(
-            f"""
-            <div style="padding: 12px 8px 10px 8px;">
-                <div class="qx-logo"><span class="qx-logo-mark"><svg viewBox="0 0 64 64" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="38" r="18" stroke="#fff" stroke-width="2.5" fill="none"/><path d="M22 56c0-6 4.5-10 10-10s10 4 10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><ellipse cx="32" cy="24" rx="14" ry="4" stroke="#fff" stroke-width="2.5" fill="none"/><path d="M18 24c0-8 6-14 14-14s14 6 14 14" stroke="#fff" stroke-width="2.5" fill="none"/><circle cx="32" cy="14" r="4" stroke="#fff" stroke-width="2.5" fill="none"/><circle cx="26" cy="36" r="5" stroke="#fff" stroke-width="2.2" fill="none"/><circle cx="38" cy="36" r="5" stroke="#fff" stroke-width="2.2" fill="none"/><line x1="31" y1="36" x2="33" y2="36" stroke="#fff" stroke-width="2"/><path d="M28 44c2 2 4 2 6 0" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M36 33l38 37" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M54 20l2-6 2 6-6 2 6 2-2 6-2-6 6-2z" fill="#fff"/></svg></span> Léon</div>
-                <div class="qx-logo-sub">DATA QUALITY</div>
+        # --- Logo ---
+        st.markdown(f'''
+        <div style="padding:20px 16px 16px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#0E9C8A,#1BD1B4);
+                    display:flex;align-items:center;justify-content:center;
+                    box-shadow:0 4px 12px -4px rgba(14,156,138,0.5);">
+                    <svg viewBox="0 0 64 64" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="32" cy="38" r="18" stroke="#fff" stroke-width="2.5"/>
+                        <path d="M22 56c0-6 4.5-10 10-10s10 4 10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+                        <ellipse cx="32" cy="24" rx="14" ry="4" stroke="#fff" stroke-width="2.5"/>
+                        <path d="M18 24c0-8 6-14 14-14s14 6 14 14" stroke="#fff" stroke-width="2.5"/>
+                        <circle cx="32" cy="14" r="4" stroke="#fff" stroke-width="2.5"/>
+                        <circle cx="26" cy="36" r="5" stroke="#fff" stroke-width="2.2"/>
+                        <circle cx="38" cy="36" r="5" stroke="#fff" stroke-width="2.2"/>
+                        <line x1="31" y1="36" x2="33" y2="36" stroke="#fff" stroke-width="2"/>
+                        <path d="M28 44c2 2 4 2 6 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M36 33l2 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M54 20l2-6 2 6-6 2 6 2-2 6-2-6 6-2z" fill="#fff"/>
+                    </svg>
+                </div>
+                <div>
+                    <div style="font-size:1.15rem;font-weight:700;color:{t["text_primary"]};">L\u00e9on</div>
+                    <div style="font-size:0.62rem;letter-spacing:0.18em;color:{t["accent"]};text-transform:uppercase;font-weight:600;">Data Quality</div>
+                </div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        </div>
+        <div style="height:1px;background:{t["border"]};margin:0 16px 16px;"></div>
+        ''', unsafe_allow_html=True)
 
-        st.markdown(f'<div class="qx-nav-label">PRINCIPAL</div>', unsafe_allow_html=True)
+        # --- Navigation: PRINCIPAL ---
+        st.markdown(f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.12em;color:{t["text_secondary"]};padding:4px 16px 10px;">PRINCIPAL</div>', unsafe_allow_html=True)
 
         current_page = st.session_state.get("page", "dashboard")
         nav_main = [
             ("dashboard", "Tableau de bord", ":material/dashboard:"),
-            ("customer_data", "Données clients", ":material/group:"),
-            ("rule_catalog", "Catalogue de règles", ":material/menu_book:"),
+            ("customer_data", "Donn\u00e9es clients", ":material/group:"),
+            ("rule_catalog", "Catalogue de r\u00e8gles", ":material/menu_book:"),
             ("run_analysis", "Lancer l'analyse", ":material/play_circle:"),
         ]
         for page_id, label, icon in nav_main:
-            is_active = current_page == page_id
-            if st.button(
-                label,
-                key=f"nav_{page_id}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-                icon=icon,
-            ):
+            if st.button(label, key=f"nav_{page_id}", use_container_width=True,
+                         type="primary" if current_page == page_id else "secondary", icon=icon):
                 st.session_state["page"] = page_id
                 st.rerun()
 
-        st.markdown(f'<div class="qx-nav-label">RÉSULTATS</div>', unsafe_allow_html=True)
+        # --- Navigation: RESULTATS ---
+        st.markdown(f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.12em;color:{t["text_secondary"]};padding:18px 16px 10px;">R\u00c9SULTATS</div>', unsafe_allow_html=True)
 
-        nav_results = [
-            ("findings", "Anomalies", ":material/warning:", open_findings),
-            ("tasks", "Tâches", ":material/checklist:", open_tasks),
-        ]
-        for page_id, label, icon, badge_count in nav_results:
-            badge = f" ({badge_count})" if badge_count else ""
-            is_active = current_page == page_id
-            if st.button(
-                f"{label}{badge}",
-                key=f"nav_{page_id}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-                icon=icon,
-            ):
-                st.session_state["page"] = page_id
-                st.rerun()
+        _badge_findings = f"  \u00b7  {open_findings}" if open_findings else ""
+        _badge_tasks = f"  \u00b7  {open_tasks}" if open_tasks else ""
+        _badge_fr = f"  \u00b7  {fr_count}" if fr_count else ""
 
-        st.markdown(f'<div class="qx-nav-label">OUTILS</div>', unsafe_allow_html=True)
+        if st.button(f"Anomalies{_badge_findings}", key="nav_findings", use_container_width=True,
+                     type="primary" if current_page == "findings" else "secondary", icon=":material/warning:"):
+            st.session_state["page"] = "findings"
+            st.rerun()
+        if st.button(f"T\u00e2ches{_badge_tasks}", key="nav_tasks", use_container_width=True,
+                     type="primary" if current_page == "tasks" else "secondary", icon=":material/checklist:"):
+            st.session_state["page"] = "tasks"
+            st.rerun()
+        # if st.button(f"France{_badge_fr}", key="nav_france", use_container_width=True,
+        #              type="primary" if current_page == "france" else "secondary", icon=":material/public:"):
+        #     st.session_state["page"] = "france"
+        #     st.rerun()
 
-        nav_tools = [
-            ("exports", "Exports", ":material/download:"),
-        ]
-        for page_id, label, icon in nav_tools:
-            is_active = current_page == page_id
-            if st.button(
-                label,
-                key=f"nav_{page_id}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-                icon=icon,
-            ):
-                st.session_state["page"] = page_id
-                st.rerun()
+        # --- Navigation: OUTILS ---
+        st.markdown(f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.12em;color:{t["text_secondary"]};padding:18px 16px 10px;">OUTILS</div>', unsafe_allow_html=True)
 
+        if st.button("Exports", key="nav_exports", use_container_width=True,
+                     type="primary" if current_page == "exports" else "secondary", icon=":material/download:"):
+            st.session_state["page"] = "exports"
+            st.rerun()
+
+        # --- Bottom: source status ---
         st.markdown("---")
+        _src_mode = st.session_state.get("source_mode", "snowflake")
+        _src_label = st.session_state.get("uploaded_filename", "") if _src_mode == "file" else "Snowflake"
+        st.markdown(f'''
+        <div style="padding:4px 0 8px;display:flex;align-items:center;gap:8px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:#16A34A;box-shadow:0 0 0 3px rgba(22,163,74,0.15);"></span>
+            <span style="font-size:0.75rem;color:{t["text_secondary"]};">Source connect\u00e9e \u00b7 {html.escape(_src_label)}</span>
+        </div>
+        ''', unsafe_allow_html=True)
 
-        # Theme toggle + Snowflake connection (compact)
-        col_theme, col_spacer = st.columns([1, 1])
-        with col_theme:
-            is_light = st.toggle("☀️", value=st.session_state.get("theme") == "light", key="theme_toggle")
-            new_theme = "light" if is_light else "dark"
-            if st.session_state.get("theme") != new_theme:
-                st.session_state["theme"] = new_theme
-                st.rerun()
-            st.session_state["theme"] = new_theme
-
-        with st.expander("⚙️ Source", expanded=False):
+        with st.expander("\u2699\ufe0f Configuration", expanded=False):
             _dbs = list_snowflake_databases()
             _cur_db = st.session_state.get("sf_database", "")
-            sel_db = st.selectbox(
-                "Base de données",
-                _dbs or [_cur_db],
-                index=(_dbs.index(_cur_db) if _cur_db in _dbs else 0),
-                key="sf_db_select",
-            )
+            sel_db = st.selectbox("Base", _dbs or [_cur_db],
+                index=(_dbs.index(_cur_db) if _cur_db in _dbs else 0), key="sf_db_select")
             _schemas = list_snowflake_schemas(sel_db) if sel_db else []
             _cur_schema = st.session_state.get("sf_schema", "")
-            sel_schema = st.selectbox(
-                "Schéma",
-                _schemas or [_cur_schema],
-                index=(_schemas.index(_cur_schema) if _cur_schema in _schemas else 0),
-                key="sf_schema_select",
-            )
+            sel_schema = st.selectbox("Sch\u00e9ma", _schemas or [_cur_schema],
+                index=(_schemas.index(_cur_schema) if _cur_schema in _schemas else 0), key="sf_schema_select")
             _tables = list_snowflake_tables(sel_db, sel_schema) if sel_db and sel_schema else []
             _cur_table = st.session_state.get("sf_table", "DIM_ACCOUNT")
-            sel_table = st.selectbox(
-                "Table",
-                _tables or [_cur_table],
-                index=(_tables.index(_cur_table) if _cur_table in _tables else 0),
-                key="sf_table_select",
-            )
+            sel_table = st.selectbox("Table", _tables or [_cur_table],
+                index=(_tables.index(_cur_table) if _cur_table in _tables else 0), key="sf_table_select")
             if st.button("Valider", type="primary", use_container_width=True, key="sf_validate"):
                 st.session_state["sf_database"] = sel_db
                 st.session_state["sf_schema"] = sel_schema
                 st.session_state["sf_table"] = sel_table
                 load_dim_account.clear()
-                list_snowflake_databases.clear()
-                list_snowflake_schemas.clear()
-                list_snowflake_tables.clear()
                 st.toast(f"Source : {sel_db}.{sel_schema}.{sel_table}")
                 st.rerun()
-
-        with st.expander("📂 Uploader un fichier", expanded=False):
-            uploaded_file = st.file_uploader(
-                "CSV ou Excel",
-                type=["csv", "xlsx", "xls"],
-                key="sidebar_file_upload",
-                label_visibility="collapsed",
-            )
+            st.markdown("---")
+            uploaded_file = st.file_uploader("CSV ou Excel", type=["csv", "xlsx", "xls"],
+                key="sidebar_file_upload", label_visibility="collapsed")
             if uploaded_file is not None:
-                if st.button("Charger le fichier", type="primary", use_container_width=True, key="sidebar_upload_btn"):
+                if st.button("Charger", type="primary", use_container_width=True, key="sidebar_upload_btn"):
                     try:
                         if uploaded_file.name.endswith(".csv"):
                             _udf = pd.read_csv(uploaded_file, dtype=str)
@@ -4524,36 +4523,18 @@ def render_sidebar():
                         st.session_state["uploaded_df"] = _udf
                         st.session_state["uploaded_filename"] = uploaded_file.name
                         st.session_state["source_mode"] = "file"
-                        st.toast(f"✓ {uploaded_file.name} — {len(_udf)} lignes chargées")
+                        st.toast(f"\u2713 {uploaded_file.name} \u2014 {len(_udf)} lignes")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erreur lecture : {e}")
-            if st.session_state.get("uploaded_filename"):
-                st.caption(f"Fichier actif : {st.session_state['uploaded_filename']}")
-                # Option to create Snowflake table from uploaded file
-                _up_db = st.session_state.get("sf_database", "QUALITY_TEST")
-                _up_sch = st.session_state.get("sf_schema", "COMMERCIAL_DATA")
-                _default_tbl = st.session_state["uploaded_filename"].rsplit(".", 1)[0].upper().replace(" ", "_").replace("-", "_")
-                _tbl_name = st.text_input("Nom table Snowflake", value=_default_tbl, key="sidebar_tbl_name")
-                _target_fqn = f"{_up_db}.{_up_sch}.{_tbl_name}"
-                if st.button("Créer table sur Snowflake", key="sidebar_create_sf_table", use_container_width=True):
-                    with st.spinner(f"Création de {_target_fqn}…"):
-                        _ok = stage_dataframe_to_snowflake(st.session_state["uploaded_df"], _target_fqn)
-                    if _ok:
-                        st.session_state["sf_table"] = _tbl_name
-                        st.session_state["source_mode"] = "snowflake"
-                        list_snowflake_tables.clear()
-                        load_dim_account.clear()
-                        add_audit_entry("Table créée depuis CSV", f"{st.session_state['uploaded_filename']} → {_target_fqn}")
-                        st.toast(f"✓ Table `{_target_fqn}` créée")
-                        st.rerun()
-                    else:
-                        st.error("Erreur lors de la création.")
-                if st.button("Revenir à Snowflake", key="sidebar_back_sf", use_container_width=True):
-                    st.session_state["source_mode"] = "snowflake"
-                    st.session_state.pop("uploaded_df", None)
-                    st.session_state.pop("uploaded_filename", None)
-                    st.rerun()
+                        st.error(f"Erreur : {e}")
+            st.markdown("---")
+            if st.button("Se d\u00e9connecter", key="sidebar_signout", use_container_width=True, icon=":material/logout:"):
+                for k in ["authenticated", "sf_password", "sf_passcode", "sf_authenticator",
+                          "uploaded_df", "uploaded_filename", "findings", "fr_upload_anomalies",
+                          "source_mode"]:
+                    st.session_state.pop(k, None)
+                _build_conn.clear()
+                st.rerun()
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
@@ -4684,12 +4665,27 @@ def page_dashboard():
     _hits_data = load_rule_hits() if _analysis_done else []
 
     # Show empty state if no data and no findings
-    if not _relevant_findings and not _src_table:
-        st.info("Configurez une source de données dans le menu **Données clients** pour commencer.")
 
     # =====================================================================
-    # ROW 1 — KPI Cards
+    # Dashboard Header — Title + Greeting + Date + AI Button + Avatar
     # =====================================================================
+    _user_name = st.session_state.get("sf_user", "Snowadmin")
+    _today_fmt = _now().strftime("%d %b. %Y").lstrip("0")
+    _user_initial = _user_name[0].upper() if _user_name else "S"
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;">
+        <div>
+            <h1 style="font-size:1.75rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px 0;letter-spacing:-0.02em;">Tableau de bord</h1>
+            <p style="font-size:0.88rem;color:{t["text_secondary"]};margin:0;">Bonjour <strong style="color:{t["text_primary"]};">{html.escape(_user_name)}</strong> &mdash; voici l&rsquo;\u00e9tat de sant\u00e9 de vos donn\u00e9es clients.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:{t["card_bg"]};border:1px solid {t["border"]};border-radius:10px;font-size:0.78rem;color:{t["text_secondary"]};font-weight:500;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{t["text_secondary"]}" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {_today_fmt}
+            </div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
     _obj = 80
     _score_display = f"{compliance_score}" if compliance_score is not None else "—"
     _score_suffix = '<span style="font-size:1.2rem;font-weight:600;">%</span>' if compliance_score is not None else ""
@@ -4712,7 +4708,7 @@ def page_dashboard():
     kpi_html = f"""
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;">
         <!-- Score conformité -->
-        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-radius:14px;padding:22px 22px 18px;">
+        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-top:3px solid {_score_badge_color};border-radius:14px;padding:22px 22px 18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <div style="font-size:0.68rem;font-weight:600;color:{t['text_secondary']};text-transform:uppercase;letter-spacing:0.06em;">Score de conformité</div>
                 <div style="width:32px;height:32px;border-radius:8px;background:rgba(22,163,74,0.1);display:flex;align-items:center;justify-content:center;">
@@ -4727,7 +4723,7 @@ def page_dashboard():
             </div>
         </div>
         <!-- Anomalies -->
-        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-radius:14px;padding:22px 22px 18px;">
+        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-top:3px solid #eab308;border-radius:14px;padding:22px 22px 18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <div style="font-size:0.68rem;font-weight:600;color:{t['text_secondary']};text-transform:uppercase;letter-spacing:0.06em;">Anomalies</div>
                 <div style="width:32px;height:32px;border-radius:8px;background:rgba(234,179,8,0.1);display:flex;align-items:center;justify-content:center;">
@@ -4743,7 +4739,7 @@ def page_dashboard():
             </div>
         </div>
         <!-- Tâches ouvertes -->
-        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-radius:14px;padding:22px 22px 18px;">
+        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-top:3px solid #2563eb;border-radius:14px;padding:22px 22px 18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <div style="font-size:0.68rem;font-weight:600;color:{t['text_secondary']};text-transform:uppercase;letter-spacing:0.06em;">Tâches ouvertes</div>
                 <div style="width:32px;height:32px;border-radius:8px;background:rgba(2,132,199,0.1);display:flex;align-items:center;justify-content:center;">
@@ -4758,7 +4754,7 @@ def page_dashboard():
             </div>
         </div>
         <!-- Complétude données -->
-        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-radius:14px;padding:22px 22px 18px;">
+        <div style="background:{t['card_bg']};border:1px solid {t['border']};border-top:3px solid #0d9488;border-radius:14px;padding:22px 22px 18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <div style="font-size:0.68rem;font-weight:600;color:{t['text_secondary']};text-transform:uppercase;letter-spacing:0.06em;">Complétude données</div>
                 <div style="width:32px;height:32px;border-radius:8px;background:rgba(22,163,74,0.1);display:flex;align-items:center;justify-content:center;">
@@ -5057,9 +5053,20 @@ def page_dashboard():
 
 
 def page_customer_data():
-    page_header("Données clients", "Portefeuille comptes B2B — recherche, filtres et détail par enregistrement.")
+    t = get_theme()
+    accent = t['accent']
 
-    search = st.text_input("Rechercher", placeholder="Raison sociale, SIREN, SIRET, ID compte…")
+    # --- Premium header ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;">
+        <div>
+            <h1 style="font-size:1.7rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px;">Donn\u00e9es clients</h1>
+            <p style="font-size:0.85rem;color:{t["text_secondary"]};margin:0;">Portefeuille comptes B2B \u2014 recherche, filtres et d\u00e9tail par enregistrement.</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    search = st.text_input("Rechercher", placeholder="Raison sociale, SIREN, SIRET, ID compte\u2026")
     df, _source_label = _get_active_data()
     if df.empty:
         df = pd.DataFrame(columns=["account_id", "company_name", "siren", "siret", "address", "naf", "status"])
@@ -5086,11 +5093,22 @@ def page_customer_data():
 def page_run_analysis():
     t = get_theme()
     accent = t['accent']
-    page_header(
-        "Lancer l'analyse",
-        "Configurez et exécutez un contrôle qualité sur vos données.",
-        badges=["Moteur SQL", "INSEE 29M+"],
-    )
+
+    # --- Premium header ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;">
+        <div>
+            <h1 style="font-size:1.7rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px;">Lancer l\u2019analyse</h1>
+            <p style="font-size:0.85rem;color:{t["text_secondary"]};margin:0;">Configurez et ex\u00e9cutez un contr\u00f4le qualit\u00e9 sur vos donn\u00e9es.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:0.68rem;padding:4px 10px;background:rgba(14,156,138,0.1);color:{accent};
+                border-radius:999px;font-weight:600;">Moteur SQL</span>
+            <span style="font-size:0.68rem;padding:4px 10px;background:rgba(37,99,235,0.1);color:#2563eb;
+                border-radius:999px;font-weight:600;">INSEE 29M+</span>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
     if "wizard_step" not in st.session_state:
         st.session_state["wizard_step"] = 1
@@ -5139,6 +5157,18 @@ def page_run_analysis():
             f'<p style="font-size:0.8rem;color:{t["text_secondary"]};margin:0 0 10px 13px;">Choisissez les dimensions de qualité à contrôler. La priorité indique l\'impact métier.</p>',
             unsafe_allow_html=True,
         )
+
+        # --- Select All / Reject All buttons ---
+        _col_sel_all, _col_rej_all, _col_spacer = st.columns([1, 1, 2])
+        with _col_sel_all:
+            if st.button("✔ Tout sélectionner", key="select_all_subjects", use_container_width=True):
+                st.session_state["selected_subjects"] = [s["id"] for s in ANALYSIS_SUBJECTS]
+                st.rerun()
+        with _col_rej_all:
+            if st.button("✘ Tout rejeter", key="reject_all_subjects", use_container_width=True):
+                st.session_state["selected_subjects"] = []
+                st.rerun()
+
         selected = []
         for subj in ANALYSIS_SUBJECTS:
             checked = subj["id"] in st.session_state["selected_subjects"]
@@ -5217,35 +5247,6 @@ def page_run_analysis():
             key="wizard_extra_table",
             help="Analyser une 2e table avec les mêmes règles personnalisées.",
         )
-
-        # --- Upload fichier comme source alternative ---
-        st.markdown("---")
-        t = get_theme()
-        st.markdown(
-            f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
-            f'<div style="width:24px;height:24px;border-radius:6px;background:{t["accent_soft"]};display:flex;align-items:center;justify-content:center;">'
-            f'<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="{t["accent"]}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-            f'</div>'
-            f'<span style="font-size:0.85rem;font-weight:600;color:{t["text_primary"]};">Ou importer un fichier</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-        wizard_upload = st.file_uploader(
-            "Fichier CSV / Excel",
-            type=["csv", "txt", "tsv", "xlsx", "xls", "xlsm"],
-            key="wizard_file_upload",
-        )
-        if wizard_upload:
-            try:
-                df_uploaded = load_uploaded_file(wizard_upload)
-                st.success(f"**{wizard_upload.name}** · {len(df_uploaded)} lignes · {len(df_uploaded.columns)} colonnes")
-                st.session_state["wizard_uploaded_df"] = df_uploaded
-                st.session_state["wizard_source"] = "file"
-            except ValueError as exc:
-                st.error(str(exc))
-        else:
-            st.session_state.pop("wizard_uploaded_df", None)
-            st.session_state["wizard_source"] = "snowflake"
 
         # --- JOIN Table Configuration (Cortex AI) ---
         st.markdown("---")
@@ -5362,6 +5363,255 @@ def page_run_analysis():
             st.session_state.pop("wizard_join_config", None)
             st.session_state.pop("wizard_ai_rules", None)
             st.session_state.pop("wizard_ai_suggestions", None)
+
+        st.markdown("---")
+
+        # --- Import règles métier ---
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+            f'<div style="width:24px;height:24px;border-radius:6px;background:{t["accent_soft"]};display:flex;align-items:center;justify-content:center;">'
+            f'<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="{accent}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            f'</div>'
+            f'<span style="font-size:0.92rem;font-weight:700;color:{t["text_primary"]};">Importer des r\u00e8gles m\u00e9tier</span>'
+            f'</div>'
+            f'<p style="font-size:0.76rem;color:{t["text_secondary"]};margin:0 0 10px 34px;">Uploadez un document d\u00e9crivant vos r\u00e8gles en langage naturel pour les convertir en r\u00e8gles ex\u00e9cutables.</p>',
+            unsafe_allow_html=True,
+        )
+        rules_file = st.file_uploader(
+            "Document de r\u00e8gles m\u00e9tier",
+            type=["txt", "csv", "pdf", "docx", "md"],
+            key="wizard_rules_file",
+            label_visibility="collapsed",
+        )
+        if rules_file:
+            # Extract text from uploaded file
+            _rules_text = ""
+            try:
+                if rules_file.name.endswith((".txt", ".md", ".csv")):
+                    _rules_text = rules_file.read().decode("utf-8", errors="ignore")
+                elif rules_file.name.endswith(".pdf"):
+                    try:
+                        import pypdf
+                        reader = pypdf.PdfReader(rules_file)
+                        _rules_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+                    except ImportError:
+                        st.warning("Module `pypdf` non install\u00e9. Utilisez un fichier .txt ou .csv.")
+                elif rules_file.name.endswith(".docx"):
+                    try:
+                        import docx
+                        doc = docx.Document(rules_file)
+                        _rules_text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                    except ImportError:
+                        st.warning("Module `python-docx` non install\u00e9. Utilisez un fichier .txt ou .csv.")
+            except Exception as e:
+                st.error(f"Erreur lecture : {e}")
+
+            if _rules_text:
+                # Truncate to ~4000 chars for Cortex context
+                _rules_text = _rules_text[:4000]
+                st.caption(f"Document charg\u00e9 : **{rules_file.name}** \u00b7 {len(_rules_text)} caract\u00e8res")
+
+                if st.button("Analyser le document", type="primary", key="btn_ai_rules_extract", icon=":material/auto_awesome:"):
+                    with st.spinner("Extraction des r\u00e8gles m\u00e9tier..."):
+                        _fields_list = "siren, siret, vat, company_name, email, phone, address, city, postal_code, country, naf, legal_form, status, website, capital"
+                        _prompt = (
+                            "Tu es un expert en qualit\u00e9 de donn\u00e9es B2B. Analyse le texte suivant et extrais TOUTES les r\u00e8gles de validation de donn\u00e9es.\n\n"
+                            "Pour chaque r\u00e8gle, retourne un objet JSON avec :\n"
+                            "- name: nom court de la r\u00e8gle (en fran\u00e7ais)\n"
+                            f"- field: le champ cible (parmi: {_fields_list})\n"
+                            "- rule_type: type de validation (regex, not_empty, in_list, length)\n"
+                            "- pattern: le pattern (regex pour regex, valeurs s\u00e9par\u00e9es par virgule pour in_list, min:max pour length, vide pour not_empty)\n"
+                            "- severity: HIGH, MEDIUM ou LOW\n"
+                            "- description: explication courte en fran\u00e7ais\n\n"
+                            "Retourne UNIQUEMENT un tableau JSON valide (pas de texte autour, pas de markdown).\n\n"
+                            f"TEXTE :\n{_rules_text}"
+                        )
+                        _prompt_escaped = _prompt.replace("'", "\\'").replace("$$", "$ $")
+                        try:
+                            _result = _sf_query(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-large2', $${_prompt}$$) AS r")
+                            if not _result.empty:
+                                _raw = _result.iloc[0]["r"] if "r" in _result.columns else _result.iloc[0][0]
+                                # Parse JSON from response
+                                _raw = _raw.strip()
+                                # Try to find JSON array in response
+                                _json_start = _raw.find("[")
+                                _json_end = _raw.rfind("]") + 1
+                                if _json_start >= 0 and _json_end > _json_start:
+                                    _json_str = _raw[_json_start:_json_end]
+                                    import json as _json_mod
+                                    _extracted_rules = _json_mod.loads(_json_str)
+                                    st.session_state["ai_extracted_rules"] = _extracted_rules
+                                    st.rerun()
+                                else:
+                                    st.error("L'IA n'a pas retourn\u00e9 un JSON valide. R\u00e9essayez.")
+                            else:
+                                st.error("Pas de r\u00e9ponse de Cortex AI.")
+                        except Exception as e:
+                            st.error(f"Erreur Cortex AI : {e}")
+
+        # --- Display extracted rules: master-detail with toggles ---
+        if "ai_extracted_rules" in st.session_state and st.session_state["ai_extracted_rules"]:
+            _ext_rules = st.session_state["ai_extracted_rules"]
+            _type_labels = {"regex": "FORMAT", "not_empty": "OBLIGATOIRE", "in_list": "LISTE", "length": "LONGUEUR"}
+            _field_to_cat = {
+                "siren": "Identit\u00e9", "siret": "Identit\u00e9", "vat": "Identit\u00e9", "naf": "Identit\u00e9",
+                "legal_form": "Identit\u00e9", "company_name": "Identit\u00e9",
+                "email": "Contact", "phone": "Contact", "website": "Contact",
+                "address": "Localisation", "city": "Localisation", "postal_code": "Localisation", "country": "Localisation",
+                "capital": "Bancaire", "status": "Commercial",
+            }
+
+            # Init active states
+            if "_ai_rule_active" not in st.session_state:
+                st.session_state["_ai_rule_active"] = {i: True for i in range(len(_ext_rules))}
+
+            _n_active = sum(1 for v in st.session_state["_ai_rule_active"].values() if v)
+            _n_high = sum(1 for r in _ext_rules if r.get("severity") == "HIGH")
+            _n_med = sum(1 for r in _ext_rules if r.get("severity") == "MEDIUM")
+            _n_low = len(_ext_rules) - _n_high - _n_med
+
+            # Compact header
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:14px;margin:14px 0 10px;">'
+                f'<span style="font-size:0.85rem;font-weight:700;color:{t["text_primary"]};">{len(_ext_rules)} r\u00e8gles</span>'
+                f'<span style="font-size:0.72rem;color:{t["text_secondary"]};">{_n_active} actives</span>'
+                f'<div style="display:flex;gap:0;width:70px;height:5px;border-radius:3px;overflow:hidden;">'
+                f'<div style="flex:{max(_n_high,0.1)};background:#ef4444;"></div>'
+                f'<div style="flex:{max(_n_med,0.1)};background:#f59e0b;"></div>'
+                f'<div style="flex:{max(_n_low,0.1)};background:#94a3b8;"></div></div>'
+                f'<span style="font-size:0.65rem;color:{t["text_secondary"]};">{_n_high} haute \u00b7 {_n_med} moy \u00b7 {_n_low} basse</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Group by category
+            _grouped = {}
+            for idx, rule in enumerate(_ext_rules):
+                cat = _field_to_cat.get(rule.get("field", ""), "Autre")
+                if cat not in _grouped:
+                    _grouped[cat] = []
+                _grouped[cat].append((idx, rule))
+
+            # Master-detail layout
+            col_master, col_detail = st.columns([1.2, 0.8])
+
+            with col_master:
+                for cat_name, cat_items in _grouped.items():
+                    _cat_active = sum(1 for idx, _ in cat_items if st.session_state["_ai_rule_active"].get(idx, True))
+                    with st.expander(f"**{cat_name}** ({len(cat_items)}) \u2014 {_cat_active}/{len(cat_items)} actives", expanded=True):
+                        for idx, rule in cat_items:
+                            _sev_c = "#ef4444" if rule.get("severity") == "HIGH" else ("#f59e0b" if rule.get("severity") == "MEDIUM" else "#94a3b8")
+                            _r_type = _type_labels.get(rule.get("rule_type", ""), rule.get("rule_type", ""))
+                            _is_sel = st.session_state.get("_ai_sel_rule") == idx
+                            col_tog, col_name, col_sel = st.columns([0.12, 0.7, 0.18])
+                            with col_tog:
+                                _active = st.toggle(" ", value=st.session_state["_ai_rule_active"].get(idx, True), key=f"ai_tog_{idx}", label_visibility="collapsed")
+                                st.session_state["_ai_rule_active"][idx] = _active
+                            with col_name:
+                                st.markdown(
+                                    f'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'
+                                    f'<span style="width:8px;height:8px;border-radius:50%;background:{_sev_c};flex-shrink:0;"></span>'
+                                    f'<span style="font-size:0.8rem;font-weight:600;color:{t["text_primary"]};{"opacity:0.4;" if not _active else ""}">{html.escape(rule.get("name",""))}</span>'
+                                    f'</div>',
+                                    unsafe_allow_html=True,
+                                )
+                            with col_sel:
+                                if st.button("\u203a", key=f"ai_sel_{idx}", use_container_width=True):
+                                    st.session_state["_ai_sel_rule"] = idx
+                                    st.rerun()
+
+            with col_detail:
+                _sel_idx = st.session_state.get("_ai_sel_rule", 0)
+                if _sel_idx >= len(_ext_rules):
+                    _sel_idx = 0
+                _sel_rule = _ext_rules[_sel_idx]
+                _sev_colors = {"HIGH": "#ef4444", "MEDIUM": "#f59e0b", "LOW": "#3b82f6"}
+                _sev_label = {"HIGH": "HAUTE PRIORIT\u00c9", "MEDIUM": "MOYENNE PRIORIT\u00c9", "LOW": "BASSE PRIORIT\u00c9"}
+                _sev_c = _sev_colors.get(_sel_rule.get("severity", ""), "#94a3b8")
+                _is_active = st.session_state["_ai_rule_active"].get(_sel_idx, True)
+                _state_label = "ACTIVE" if _is_active else "INACTIVE"
+                _state_color = "#16a34a" if _is_active else "#94a3b8"
+                _field_label = _sel_rule.get("field", "").replace("_", " ").title()
+
+                st.markdown(
+                    f'<div style="background:{t["card_bg"]};border:1px solid {t["border"]};border-radius:12px;padding:22px;">'
+                    f'<span style="font-size:0.58rem;padding:3px 9px;border:1px solid {_sev_c};color:{_sev_c};border-radius:999px;font-weight:700;">{_sev_label.get(_sel_rule.get("severity",""), "")}</span>'
+                    f'<h3 style="font-size:1.05rem;font-weight:700;color:{t["text_primary"]};margin:12px 0 6px;">{html.escape(_sel_rule.get("name", ""))}</h3>'
+                    f'<div style="margin-bottom:12px;">'
+                    f'<code style="font-size:0.65rem;padding:2px 7px;background:{t["border_subtle"]};border-radius:4px;">{html.escape(_sel_rule.get("field", ""))}</code>'
+                    f'<span style="font-size:0.72rem;color:{t["text_secondary"]};margin-left:6px;">\u00b7 {html.escape(_field_label)}</span>'
+                    f'</div>'
+                    f'<p style="font-size:0.8rem;color:{t["text_secondary"]};margin:0 0 14px;">{html.escape(_sel_rule.get("description", ""))}</p>'
+                    f'<div style="background:{t["border_subtle"]};border-radius:8px;padding:9px 12px;margin-bottom:16px;">'
+                    f'<span style="font-size:0.7rem;font-weight:700;color:{t["text_secondary"]};">{_type_labels.get(_sel_rule.get("rule_type",""), "")}</span>'
+                    f'{"  &mdash;  <code style=" + chr(34) + "font-size:0.68rem;" + chr(34) + ">" + html.escape(_sel_rule.get("pattern","")) + "</code>" if _sel_rule.get("pattern") else ""}'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Tester une valeur
+                _test_val = st.text_input("Tester une valeur", placeholder="Saisissez pour contr\u00f4ler", key="ai_rule_tester")
+                if _test_val:
+                    st.caption("Saisissez une valeur pour la contr\u00f4ler contre cette r\u00e8gle.")
+                    _rtype = _sel_rule.get("rule_type", "")
+                    _pattern = _sel_rule.get("pattern", "")
+                    _pass = False
+                    if _rtype == "not_empty":
+                        _pass = bool(_test_val.strip())
+                    elif _rtype == "regex":
+                        try:
+                            _pass = bool(re.search(_pattern or r'.+', _test_val))
+                        except re.error:
+                            _pass = bool(_test_val.strip())
+                    elif _rtype == "in_list":
+                        _allowed = [v.strip().upper() for v in (_pattern or "").split(",") if v.strip()]
+                        _pass = _test_val.strip().upper() in _allowed
+                    elif _rtype == "length":
+                        parts = (_pattern or "0:9999").split(":")
+                        mn = int(parts[0]) if parts[0].isdigit() else 0
+                        mx = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 9999
+                        _pass = mn <= len(_test_val) <= mx
+                    else:
+                        _pass = bool(_test_val.strip())
+                    if _pass:
+                        st.success("Conforme")
+                    else:
+                        st.error("Rejet\u00e9")
+
+                # \u00c9tat badge
+                st.markdown(f'<div style="margin-top:14px;font-size:0.75rem;color:{t["text_secondary"]};">\u00c9tat : <span style="padding:3px 10px;border:1px solid {_state_color};color:{_state_color};border-radius:6px;font-weight:600;font-size:0.68rem;">{_state_label}</span></div>', unsafe_allow_html=True)
+
+            # --- Import / Annuler ---
+            st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+            col_import, col_clear, _ = st.columns([1, 1, 1])
+            with col_import:
+                _to_import = [i for i, v in st.session_state["_ai_rule_active"].items() if v]
+                if _to_import and st.button(f"Importer {len(_to_import)} r\u00e8gle(s)", type="primary", key="btn_import_ai_rules", use_container_width=True):
+                    _imported = 0
+                    for idx in _to_import:
+                        rule = _ext_rules[idx]
+                        try:
+                            create_custom_rule(
+                                name=rule.get("name", "R\u00e8gle"),
+                                target_field=rule.get("field", "company_name"),
+                                rule_type=rule.get("rule_type", "regex"),
+                                pattern=rule.get("pattern", ""),
+                                severity=rule.get("severity", "MEDIUM"),
+                                description=rule.get("description", ""),
+                            )
+                            _imported += 1
+                        except Exception:
+                            pass
+                    st.session_state.pop("ai_extracted_rules", None)
+                    st.session_state.pop("_ai_rule_active", None)
+                    st.toast(f"\u2713 {_imported} r\u00e8gle(s) import\u00e9e(s)")
+                    st.rerun()
+            with col_clear:
+                if st.button("Annuler", key="btn_clear_ai_rules", use_container_width=True):
+                    st.session_state.pop("ai_extracted_rules", None)
+                    st.session_state.pop("_ai_rule_active", None)
+                    st.rerun()
 
         st.markdown("---")
 
@@ -5803,29 +6053,68 @@ _FINDINGS_PAGE_SIZE = 10
 
 
 def page_findings():
-    page_header("Anomalies", "Examiner, prioriser et traiter les écarts de qualité détectés.")
     t = get_theme()
     accent = t['accent']
 
-    # --- Section header with accent bar ---
-    st.markdown(
-        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">'
-        f'<div style="width:3px;height:18px;border-radius:2px;background:{accent};"></div>'
-        f'<span style="font-size:0.92rem;font-weight:700;color:{t["text_primary"]};">Liste des anomalies</span>'
-        f'<span style="font-size:0.68rem;padding:3px 10px;background:{t["accent_soft"]};color:{accent};'
-        f'border-radius:999px;font-weight:600;">Snowflake connecté</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    # Load findings
+    findings = get_all_fr_anomalies()
+    if not findings:
+        findings = get_findings()
 
-    # Filters
-    col_s, col_f1, col_f2 = st.columns([2, 1, 1])
+    # Apply filters from state
+    search = ""
+    sev_filter = "Toutes"
+    status_filter = "Tous"
+
+    # Count by severity/status (before filtering)
+    _total = len(findings)
+    _open_findings = [f for f in findings if f["status"] in ("Open", "In Review")]
+    _high = sum(1 for f in findings if f["severity"] == "HIGH")
+    _med = sum(1 for f in findings if f["severity"] == "MEDIUM")
+    _low = sum(1 for f in findings if f["severity"] == "LOW")
+    _open_count = len(_open_findings)
+
+    # --- Page Header with action buttons ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
+        <div>
+            <h1 style="font-size:1.75rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px 0;letter-spacing:-0.02em;">Anomalies</h1>
+            <p style="font-size:0.88rem;color:{t["text_secondary"]};margin:0;"><strong style="color:{t["text_primary"]};">{_open_count}</strong> anomalies ouvertes d\u00e9tect\u00e9es sur vos donn\u00e9es clients.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:6px;padding:9px 16px;background:{t["card_bg"]};border:1px solid {t["border"]};border-radius:10px;font-size:0.82rem;color:{t["text_primary"]};font-weight:500;cursor:pointer;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{t["text_secondary"]}" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Exporter
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:{t["accent"]};color:#fff;border-radius:10px;font-size:0.82rem;font-weight:600;cursor:pointer;box-shadow:0 4px 12px -4px rgba(13,148,136,0.4);">
+                <span style="font-size:1rem;">+</span> R\u00e9soudre avec l&rsquo;IA
+            </div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # --- Search + Filters ---
+    col_s, col_f1, col_f2 = st.columns([2.5, 1, 1])
     with col_s:
-        search = st.text_input("Rechercher", placeholder="Entreprise, règle, type…", key="findings_search")
+        search = st.text_input("Rechercher", placeholder="Entreprise, r\u00e8gle, type d\u2019anomalie...", key="findings_search", label_visibility="visible")
     with col_f1:
-        sev_filter = st.selectbox("Sévérité", ["Toutes", "HIGH", "MEDIUM", "LOW"], key="findings_sev_filter")
+        sev_filter = st.selectbox("S\u00e9v\u00e9rit\u00e9", ["Toutes", "HIGH", "MEDIUM", "LOW"], key="findings_sev_filter")
     with col_f2:
         status_filter = st.selectbox("Statut", ["Tous", "Open", "In Review", "Resolved", "Dismissed"], key="findings_status_filter")
+
+    # --- Severity pills ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:center;gap:10px;margin:8px 0 18px;">
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid #ef4444;font-size:0.78rem;font-weight:600;color:#ef4444;">
+            {_high} \u00c9lev\u00e9e</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid #f59e0b;font-size:0.78rem;font-weight:600;color:#f59e0b;">
+            {_med} Moyenne</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid #0d9488;font-size:0.78rem;font-weight:600;color:#0d9488;">
+            {_low} Faible</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid {t["border"]};font-size:0.78rem;font-weight:600;color:{t["text_secondary"]};">
+            {_open_count} Ouvertes</span>
+    </div>
+    ''', unsafe_allow_html=True)
 
     # --- Quick web verify ---
     with st.expander("🔍 Vérification web rapide — taper une valeur à vérifier", expanded=False):
@@ -5932,7 +6221,8 @@ def page_findings():
             unsafe_allow_html=True,
         )
 
-    select_all = st.checkbox("Tout sélectionner", value=False, key="findings_select_all")
+    # --- Action row ---
+    select_all = st.checkbox("Tout s\u00e9lectionner", value=False, key="findings_select_all")
 
     # --- Resolve company names from source table if stored names look like IDs ---
     def _looks_like_id(name: str) -> bool:
@@ -6224,20 +6514,22 @@ def page_findings():
 
 
 def page_tasks():
-    page_header("Tâches", "Présélection et validation des anomalies — acceptez, corrigez ou rejetez en masse.")
     t = get_theme()
     accent = t['accent']
 
-    # --- Section header with accent bar ---
-    st.markdown(
-        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">'
-        f'<div style="width:3px;height:18px;border-radius:2px;background:{accent};"></div>'
-        f'<span style="font-size:0.92rem;font-weight:700;color:{t["text_primary"]};">File de tâches</span>'
-        f'<span style="font-size:0.68rem;padding:3px 10px;background:{t["accent_soft"]};color:{accent};'
-        f'border-radius:999px;font-weight:600;">Moteur prêt</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    # --- Premium header ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;">
+        <div>
+            <h1 style="font-size:1.7rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px;">T\u00e2ches</h1>
+            <p style="font-size:0.85rem;color:{t["text_secondary"]};margin:0;">Pr\u00e9s\u00e9lection et validation des anomalies \u2014 acceptez, corrigez ou rejetez en masse.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:0.72rem;padding:5px 14px;background:{t["accent_soft"]};color:{accent};
+                border-radius:999px;font-weight:600;">Moteur pr\u00eat</span>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
     actionable = [f for f in get_all_fr_anomalies() if f.get("status") in ("Open", "In Review")]
     if not actionable:
@@ -6456,11 +6748,24 @@ def page_tasks():
 def page_exports():
     t = get_theme()
     accent = t['accent']
-    page_header("Exports & Audit", "Rapports, restitution CRM et piste d'audit complète.")
+
+    # --- Premium header ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;">
+        <div>
+            <h1 style="font-size:1.7rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px;">Exports &amp; Audit</h1>
+            <p style="font-size:0.85rem;color:{t["text_secondary"]};margin:0;">Rapports, restitution CRM et piste d\u2019audit compl\u00e8te.</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
     today_str = _now().strftime("%Y%m%d")
     today_label = _now().strftime("%Y-%m-%d")
-    _accounts = load_dim_account(_dim_account_fqn())
+    # Use uploaded file if available, otherwise Snowflake table
+    if st.session_state.get("source_mode") == "file" and "uploaded_df" in st.session_state:
+        _accounts = st.session_state["uploaded_df"].to_dict("records")
+    else:
+        _accounts = load_dim_account(_dim_account_fqn())
     _findings = get_all_fr_anomalies()
     _corrections = get_fr_corrections()
 
@@ -6481,9 +6786,108 @@ def page_exports():
         unsafe_allow_html=True,
     )
 
+    # Build enriched export: original + corrected columns side by side (interleaved)
+    _base_df = pd.DataFrame(_accounts) if _accounts else pd.DataFrame()
+    _corr_list = _corrections or []
+
+    # Clean newlines in all cells
+    if not _base_df.empty:
+        for col in _base_df.columns:
+            _base_df[col] = _base_df[col].apply(lambda x: str(x).replace("\n", " ").replace("\r", " ") if pd.notna(x) else "")
+
+    if not _base_df.empty and _corr_list:
+        # Group corrections by company_name
+        corr_map = {}
+        for c in _corr_list:
+            key = str(c.get("company_name", "") or c.get("account_id", "")).strip()
+            if not key:
+                continue
+            if key not in corr_map:
+                corr_map[key] = {}
+            field = c.get("field", c.get("field_label", ""))
+            new_val = c.get("new_value", c.get("corrected_value", c.get("expected_value", "")))
+            if field and new_val:
+                corr_map[key][field] = new_val
+
+        # Find which fields have corrections
+        _all_corr_fields = set()
+        for corrections in corr_map.values():
+            _all_corr_fields.update(corrections.keys())
+
+        # Map correction field names to actual column names in the dataframe
+        _col_lower_map = {c.lower(): c for c in _base_df.columns}
+        _field_to_col = {}
+        for f in _all_corr_fields:
+            if f in _base_df.columns:
+                _field_to_col[f] = f
+            elif f.lower() in _col_lower_map:
+                _field_to_col[f] = _col_lower_map[f.lower()]
+
+        # Build interleaved columns: for each original column, if it has corrections, add [CORRIGÉ] right after
+        _name_cols = [c for c in _base_df.columns if c.lower() in ("company_name", "nom", "raison_sociale", "name")]
+        _id_cols = [c for c in _base_df.columns if c.lower() in ("account_id", "id", "code_client")]
+
+        # Compute corrections per row
+        _corr_values = {}  # {row_idx: {field: new_val}}
+        for idx, row in _base_df.iterrows():
+            _matched_key = None
+            for nc in _name_cols:
+                _val = str(row.get(nc, "")).strip()
+                if _val and _val in corr_map:
+                    _matched_key = _val
+                    break
+            if not _matched_key:
+                for ic in _id_cols:
+                    _val = str(row.get(ic, "")).strip()
+                    if _val and _val in corr_map:
+                        _matched_key = _val
+                        break
+            if _matched_key:
+                _corr_values[idx] = corr_map[_matched_key]
+
+        # Build new dataframe with interleaved columns
+        _new_cols = []
+        _already_paired = set()
+        for col in _base_df.columns:
+            _new_cols.append(col)
+            # Check if this column has a matching correction field
+            for f, mapped_col in _field_to_col.items():
+                if mapped_col == col and f not in _already_paired:
+                    _new_cols.append(f"{col} [CORRIG\u00c9]")
+                    _already_paired.add(f)
+                    break
+
+        # Add correction fields that don't match any existing column
+        for f in sorted(_all_corr_fields):
+            if f not in _already_paired:
+                _new_cols.append(f"{f} [CORRIG\u00c9]")
+
+        # Build the export dataframe
+        _enriched = pd.DataFrame(index=_base_df.index, columns=_new_cols)
+        for col in _base_df.columns:
+            _enriched[col] = _base_df[col]
+
+        # Fill correction columns
+        for idx, corrections in _corr_values.items():
+            for field, val in corrections.items():
+                # Find the matching [CORRIGÉ] column
+                mapped_col = _field_to_col.get(field)
+                if mapped_col:
+                    corr_col = f"{mapped_col} [CORRIG\u00c9]"
+                else:
+                    corr_col = f"{field} [CORRIG\u00c9]"
+                if corr_col in _enriched.columns:
+                    _enriched.at[idx, corr_col] = val
+
+        # Fill empty correction columns with empty string
+        _enriched = _enriched.fillna("")
+        _export_df = _enriched
+    else:
+        _export_df = _base_df
+
     exports = [
-        {"name": f"dim_account_{today_str}.csv", "date": today_label, "type": "Comptes clients",
-         "df": pd.DataFrame(_accounts) if _accounts else pd.DataFrame()},
+        {"name": f"comptes_enrichis_{today_str}.csv", "date": today_label, "type": "Comptes + Corrections",
+         "df": _export_df},
         {"name": f"rapport_anomalies_{today_str}.csv", "date": today_label, "type": "Anomalies",
          "df": pd.DataFrame(_findings) if _findings else pd.DataFrame()},
         {"name": f"corrections_crm_{today_str}.csv", "date": today_label, "type": "Corrections CRM",
@@ -7689,7 +8093,18 @@ def page_france():
 
 
 def page_rule_catalog():
-    page_header("Catalogue de règles", "Modèles prêts à l'emploi pour la qualité des données B2B françaises.")
+    t = get_theme()
+    accent = t['accent']
+
+    # --- Header ---
+    st.markdown(f'''
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;">
+        <div>
+            <h1 style="font-size:1.7rem;font-weight:800;color:{t["text_primary"]};margin:0 0 6px;">Catalogue de r\u00e8gles</h1>
+            <p style="font-size:0.85rem;color:{t["text_secondary"]};margin:0;">Mod\u00e8les pr\u00eats \u00e0 l\u2019emploi pour la qualit\u00e9 des donn\u00e9es B2B fran\u00e7aises.</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
     cols = st.columns(2)
     for i, rule in enumerate(RULE_TEMPLATES):
@@ -7706,8 +8121,6 @@ def page_rule_catalog():
             )
 
     st.markdown("---")
-
-    # --- Custom rules section (from France tab) ---
     _fr_tab_custom_rules()
 
 
@@ -7889,248 +8302,220 @@ def page_login():
 
     theme_key = st.session_state.get("theme", "light")
     is_dark = theme_key == "dark"
-    tk = THEMES[theme_key]
 
-    # --- Login page CSS ---
-    bg = "#0c1322" if is_dark else "#f8fafc"
-    card_bg = "#1e293b" if is_dark else "#ffffff"
-    border_c = "#334155" if is_dark else "#e2e8f0"
-    text_h = "#f1f5f9" if is_dark else "#0f172a"
-    text_p = "#94a3b8" if is_dark else "#64748b"
-    accent = "#2dd4bf" if is_dark else "#0d9488"
-    input_bg = "#0f172a" if is_dark else "#ffffff"
-    input_border = "#475569" if is_dark else "#e2e8f0"
-    input_text = "#f1f5f9" if is_dark else "#0f172a"
+    # --- Design tokens matching the HTML mockup ---
+    brand = "#0E9C8A"
+    brand_light = "#1BD1B4"
+    if is_dark:
+        bg = "#0A1622"
+        panel_bg = "radial-gradient(120% 100% at 0% 0%,#123a4d 0%,#060F19 55%)"
+        surface = "#101E2E"
+        ink = "#EAF1F7"
+        ink2 = "#CBD8E3"
+        slate = "#8FA3B3"
+        line = "#20303F"
+        input_bg = "#0B1826"
+    else:
+        bg = "#F4F7FA"
+        panel_bg = "radial-gradient(120% 100% at 0% 0%,#123a4d 0%,#0C1B2A 55%)"
+        surface = "#FFFFFF"
+        ink = "#0C1B2A"
+        ink2 = "#1B3047"
+        slate = "#5A6B7B"
+        line = "#E7ECF1"
+        input_bg = "#F7F9FC"
 
+    # --- Full-page CSS override ---
     st.markdown(f"""<style>
+    @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
     [data-testid="stAppViewContainer"] {{ background: {bg} !important; }}
     [data-testid="stHeader"] {{ background: transparent !important; }}
     [data-testid="stSidebar"] {{ display: none !important; }}
-    [data-testid="stMainBlockContainer"] {{ padding-top: 0.5rem !important; max-width: 100% !important; }}
-    .login-form-card {{
-        background: {card_bg}; border: 1px solid {border_c};
-        border-radius: 16px; padding: 2rem 2rem 1.5rem;
+    [data-testid="stMainBlockContainer"] {{ padding-top: 0 !important; max-width: 100% !important; padding-left:0 !important; padding-right:0 !important; }}
+    [data-testid="stForm"] {{ border: none !important; padding: 0 !important; }}
+    .login-card input, .login-card [data-baseweb="input"] input {{
+        background: {input_bg} !important; color: {ink} !important;
+        border: 1px solid {line} !important; border-radius: 11px !important;
+        padding: 12px 14px !important; font-size: 13.5px !important;
+        font-family: 'IBM Plex Mono', monospace !important;
+        -webkit-text-fill-color: {ink} !important;
     }}
-    .login-form-card label, .login-form-card p,
-    .login-form-card [data-testid="stWidgetLabel"] p,
-    .login-form-card [data-testid="stWidgetLabel"] span {{
-        color: {text_h} !important;
+    .login-card input::placeholder {{ color: {slate} !important; opacity: 0.7; }}
+    .login-card input:focus {{ border-color: {brand} !important; box-shadow: 0 0 0 3px rgba(14,156,138,0.14) !important; }}
+    .login-card [data-testid="stWidgetLabel"] p,
+    .login-card [data-testid="stWidgetLabel"] span,
+    .login-card label {{ color: {ink2} !important; font-size: 12px !important; font-weight: 600 !important; }}
+    .login-card [data-testid="stFormSubmitButton"] button {{
+        width: 100% !important;
+        background: linear-gradient(135deg, {brand}, #12b6a0) !important;
+        color: #fff !important; font-weight: 600 !important; font-size: 14.5px !important;
+        border: none !important; border-radius: 12px !important; padding: 14px !important;
+        box-shadow: 0 10px 22px -8px rgba(14,156,138,0.65) !important;
+        font-family: 'Inter', sans-serif !important;
     }}
-    .login-form-card input {{
-        background: {input_bg} !important; color: {input_text} !important;
-        border: 1px solid {input_border} !important; border-radius: 8px !important;
-        -webkit-text-fill-color: {input_text} !important;
+    .login-card [data-testid="stFormSubmitButton"] button:hover {{
+        transform: translateY(-1px); box-shadow: 0 14px 28px -8px rgba(14,156,138,0.75) !important;
     }}
-    .login-form-card input::placeholder {{ color: {text_p} !important; opacity: 0.7; }}
-    .login-form-card [data-testid="stFormSubmitButton"] button {{
-        background: {accent} !important;
-        color: #fff !important; font-weight: 600 !important;
-        border: none !important; border-radius: 10px !important; padding: 0.7rem !important;
-        box-shadow: 0 4px 14px rgba(3,105,161,0.3) !important;
-        font-size: 0.92rem !important;
-    }}
-    .login-form-card [data-testid="stFormSubmitButton"] button:hover {{
-        background: #075985 !important;
-    }}
-    [data-testid="stMainBlockContainer"] label,
-    [data-testid="stMainBlockContainer"] [data-testid="stWidgetLabel"] p,
-    [data-testid="stMainBlockContainer"] [data-testid="stWidgetLabel"] span {{
-        color: {text_h} !important;
-    }}
-    [data-testid="stRadio"] label, [data-testid="stRadio"] p {{
-        color: {text_h} !important;
-    }}
-    [data-testid="stSelectbox"] label, [data-testid="stSelectbox"] p {{
-        color: {text_h} !important;
-    }}
-    .login-footer {{
-        text-align: center; margin-top: 1.5rem; font-size: 0.72rem; color: {text_p};
-    }}
+    .login-card [data-testid="stRadio"] > div {{ flex-direction: row !important; gap: 20px !important; }}
+    .login-card [data-testid="stRadio"] label {{ color: {ink2} !important; font-weight: 500 !important; }}
+    .topbar-login [data-testid="stSelectbox"] {{ min-width: 90px; }}
+    .topbar-login [data-testid="stWidgetLabel"] p {{ font-size: 10px !important; letter-spacing: 0.1em !important;
+        text-transform: uppercase !important; color: {slate} !important; font-weight: 600 !important; }}
     </style>""", unsafe_allow_html=True)
 
     # --- Top bar: Language + Appearance ---
-    _, col_lang, col_theme = st.columns([5, 1, 1])
+    st.markdown('<div class="topbar-login">', unsafe_allow_html=True)
+    _, _, col_lang, col_theme = st.columns([4, 1, 0.8, 0.8])
     with col_lang:
-        lang_opts = ["FR Fr...", "GB English"]
+        lang_opts = ["FR", "EN"]
         lang_default = 0 if get_lang() == "fr" else 1
-        lang_sel = st.selectbox(
-            t("prefs.language"), lang_opts, index=lang_default, key="login_lang_sel",
-            label_visibility="visible",
-        )
-        new_lang = "fr" if "FR" in lang_sel else "en"
+        lang_sel = st.selectbox("Langue", lang_opts, index=lang_default, key="login_lang_sel")
+        new_lang = "fr" if lang_sel == "FR" else "en"
         if new_lang != st.session_state.get("lang", "fr"):
             st.session_state["lang"] = new_lang
             st.rerun()
     with col_theme:
-        theme_opts = [f"{'☀️' if not is_dark else '🌙'} S..."] if is_dark else [f"{'☀️'} L..."]
-        theme_opts = ["🌙 Sombre", "☀️ Clair"] if get_lang() == "fr" else ["🌙 Dark", "☀️ Light"]
-        theme_default = 0 if is_dark else 1
-        theme_sel = st.selectbox(
-            t("prefs.theme"), theme_opts, index=theme_default, key="login_theme_sel",
-            label_visibility="visible",
-        )
-        new_theme = "dark" if "ombre" in theme_sel.lower() or "dark" in theme_sel.lower() else "light"
+        theme_opts = ["Clair", "Sombre"] if get_lang() == "fr" else ["Light", "Dark"]
+        theme_default = 1 if is_dark else 0
+        theme_sel = st.selectbox("Apparence", theme_opts, index=theme_default, key="login_theme_sel")
+        new_theme = "dark" if theme_sel in ("Sombre", "Dark") else "light"
         if new_theme != st.session_state.get("theme", "light"):
             st.session_state["theme"] = new_theme
             st.rerun()
-
-    st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # --- Main 2-column layout ---
     col_hero, col_form = st.columns([1.1, 0.9], gap="large")
 
-    # --- LEFT: Hero branding ---
+    # --- LEFT: Brand panel (pure HTML) ---
     with col_hero:
-        hero_accent = "#5eead4" if is_dark else "#0d9488"
-        hero_text = "#ffffff" if is_dark else "#0f172a"
-        hero_sub = "rgba(203,213,225,0.7)" if is_dark else "#64748b"
-        hero_bg = "transparent"
-        step_bg = card_bg
-        step_border = border_c
-        step_accent = accent
-        tag_bg = f"{'rgba(2,132,199,0.08)' if is_dark else 'rgba(3,105,161,0.06)'}"
-        tag_border = f"{'rgba(2,132,199,0.2)' if is_dark else 'rgba(3,105,161,0.15)'}"
-        tag_color = accent
+        _lang = get_lang()
+        _eyebrow = "Gouvernance des donn\u00e9es B2B" if _lang == "fr" else "B2B Data Governance"
+        _h1a = "La qualit\u00e9 de vos donn\u00e9es," if _lang == "fr" else "Your data quality,"
+        _h1b = "sous contr\u00f4le." if _lang == "fr" else "under control."
+        _lead = ("Plateforme enterprise connect\u00e9e \u00e0 Snowflake \u2014 d\u00e9tection d\u2019anomalies, "
+                 "conformit\u00e9 r\u00e9glementaire fran\u00e7aise et correction assist\u00e9e par IA." if _lang == "fr"
+                 else "Enterprise platform connected to Snowflake \u2014 anomaly detection, "
+                 "French regulatory compliance and AI-assisted correction.")
+        _steps = [("01", "Ing\u00e9rer" if _lang == "fr" else "Ingest"),
+                  ("02", "Contr\u00f4ler" if _lang == "fr" else "Check"),
+                  ("03", "Corriger" if _lang == "fr" else "Fix"),
+                  ("04", "Auditer" if _lang == "fr" else "Audit")]
+        _foot = ("Connexion chiffr\u00e9e TLS \u00b7 Aucune donn\u00e9e stock\u00e9e localement" if _lang == "fr"
+                 else "TLS-encrypted connection \u00b7 No data stored locally")
 
-        hero_html = f"""
-        <div style="padding:1.5rem 0 1rem 0.5rem;font-family:'Inter','Segoe UI',sans-serif;">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.8rem;">
-                <div style="width:42px;height:42px;border-radius:50%;background:{accent};
-                    display:flex;align-items:center;justify-content:center;
-                    box-shadow:0 2px 10px rgba(13,148,136,0.3);"><svg viewBox="0 0 64 64" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="38" r="18" stroke="#fff" stroke-width="2.5" fill="none"/><path d="M22 56c0-6 4.5-10 10-10s10 4 10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/><ellipse cx="32" cy="24" rx="14" ry="4" stroke="#fff" stroke-width="2.5" fill="none"/><path d="M18 24c0-8 6-14 14-14s14 6 14 14" stroke="#fff" stroke-width="2.5" fill="none"/><circle cx="32" cy="14" r="4" stroke="#fff" stroke-width="2.5" fill="none"/><circle cx="26" cy="36" r="5" stroke="#fff" stroke-width="2.2" fill="none"/><circle cx="38" cy="36" r="5" stroke="#fff" stroke-width="2.2" fill="none"/><line x1="31" y1="36" x2="33" y2="36" stroke="#fff" stroke-width="2"/><path d="M28 44c2 2 4 2 6 0" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M36 33l38 37" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M54 20l2-6 2 6-6 2 6 2-2 6-2-6 6-2z" fill="#fff"/></svg></div>
-                <div>
-                    <div style="font-size:1.15rem;font-weight:800;color:{hero_text};letter-spacing:-0.5px;">
-                        {t('app.brand')}</div>
-                    <div style="font-size:0.6rem;letter-spacing:0.18em;color:{text_p};text-transform:uppercase;margin-top:1px;">
-                        {t('app.tagline')}</div>
+        steps_html = "".join(f'<div style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:13px 14px;"><div style="font-family:monospace;font-size:11px;color:{brand_light};font-weight:600;">{sn}</div><div style="font-size:14px;font-weight:600;margin-top:4px;color:#fff;">{st_}</div></div>' for sn, st_ in _steps)
+
+        hero_html = f'''
+        <div style="position:relative;overflow:hidden;background:{panel_bg};
+            border-radius:20px;padding:42px 46px;min-height:580px;color:#fff;font-family:Inter,sans-serif;">
+            <div style="position:absolute;width:340px;height:340px;background:{brand};border-radius:50%;
+                filter:blur(70px);top:-90px;right:-60px;opacity:0.35;"></div>
+            <div style="position:absolute;width:280px;height:280px;background:{brand_light};border-radius:50%;
+                filter:blur(70px);bottom:-100px;left:-40px;opacity:0.22;"></div>
+            <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),
+                linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px);background-size:44px 44px;"></div>
+            <div style="position:relative;z-index:2;">
+                <div style="display:flex;align-items:center;gap:13px;margin-bottom:34px;">
+                    <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,{brand},{brand_light});
+                        display:grid;place-items:center;color:#04241f;font-weight:800;font-size:23px;
+                        box-shadow:0 8px 20px -6px rgba(14,156,138,0.7);">L</div>
+                    <div>
+                        <div style="font-weight:700;font-size:21px;">L\u00e9on</div>
+                        <div style="font-size:10px;letter-spacing:0.24em;color:{brand_light};text-transform:uppercase;margin-top:2px;font-weight:600;">Data Quality</div>
+                    </div>
                 </div>
-            </div>
-            <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
-                color:{accent};margin-bottom:0.6rem;">{t('login.eyebrow')}</div>
-            <div style="width:32px;height:3px;background:{accent};border-radius:2px;margin-bottom:1.5rem;"></div>
-            <div style="font-size:2.2rem;font-weight:800;color:{hero_text};line-height:1.15;
-                letter-spacing:-1px;margin-bottom:1rem;">
-                {t('login.headline')}<br>
-                <span style="color:{hero_accent};font-style:italic;">{t('login.headline_em')}</span>
-            </div>
-            <div style="font-size:0.85rem;color:{hero_sub};line-height:1.7;max-width:440px;margin-bottom:2rem;">
-                {t('login.lead')}
-            </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1.8rem;">
-                <div style="background:{step_bg};border:1px solid {step_border};border-radius:10px;padding:12px 18px;min-width:110px;">
-                    <div style="font-size:0.62rem;font-weight:700;color:{step_accent};">01</div>
-                    <div style="font-size:0.82rem;font-weight:600;color:{hero_text};margin-top:2px;">{t('login.step.ingest')}</div>
+                <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:{brand_light};font-weight:700;">{_eyebrow}</div>
+                <div style="width:44px;height:3px;border-radius:3px;background:{brand};margin-top:10px;margin-bottom:26px;"></div>
+                <div style="font-size:34px;font-weight:700;line-height:1.18;letter-spacing:-0.02em;">
+                    {_h1a}<br><span style="color:{brand_light};font-style:italic;">{_h1b}</span></div>
+                <p style="color:rgba(174,192,206,0.85);font-size:14.5px;margin-top:16px;line-height:1.6;max-width:440px;">{_lead}</p>
+                <div style="display:flex;gap:12px;margin-top:30px;">{steps_html}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;">
+                    <span style="font-size:11px;font-weight:600;color:{brand_light};background:rgba(27,209,180,0.12);border:1px solid rgba(27,209,180,0.2);padding:5px 12px;border-radius:20px;">Snowflake Native</span>
+                    <span style="font-size:11px;font-weight:600;color:{brand_light};background:rgba(27,209,180,0.12);border:1px solid rgba(27,209,180,0.2);padding:5px 12px;border-radius:20px;">INSEE Sirene 29M+</span>
+                    <span style="font-size:11px;font-weight:600;color:{brand_light};background:rgba(27,209,180,0.12);border:1px solid rgba(27,209,180,0.2);padding:5px 12px;border-radius:20px;">E-facturation R01\u2013R08</span>
+                    <span style="font-size:11px;font-weight:600;color:{brand_light};background:rgba(27,209,180,0.12);border:1px solid rgba(27,209,180,0.2);padding:5px 12px;border-radius:20px;">Cortex Analyst</span>
                 </div>
-                <div style="background:{step_bg};border:1px solid {step_border};border-radius:10px;padding:12px 18px;min-width:110px;">
-                    <div style="font-size:0.62rem;font-weight:700;color:{step_accent};">02</div>
-                    <div style="font-size:0.82rem;font-weight:600;color:{hero_text};margin-top:2px;">{t('login.step.control')}</div>
-                </div>
-                <div style="background:{step_bg};border:1px solid {step_border};border-radius:10px;padding:12px 18px;min-width:110px;">
-                    <div style="font-size:0.62rem;font-weight:700;color:{step_accent};">03</div>
-                    <div style="font-size:0.82rem;font-weight:600;color:{hero_text};margin-top:2px;">{t('login.step.fix')}</div>
-                </div>
-                <div style="background:{step_bg};border:1px solid {step_border};border-radius:10px;padding:12px 18px;min-width:110px;">
-                    <div style="font-size:0.62rem;font-weight:700;color:{step_accent};">04</div>
-                    <div style="font-size:0.82rem;font-weight:600;color:{hero_text};margin-top:2px;">{t('login.step.audit')}</div>
-                </div>
+                <div style="margin-top:36px;display:flex;align-items:center;gap:10px;font-size:12px;color:rgba(174,192,206,0.7);">
+                    <span style="width:7px;height:7px;border-radius:50%;background:#16A34A;box-shadow:0 0 0 3px rgba(22,163,74,0.25);"></span>
+                    {_foot}</div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <span style="background:{tag_bg};border:1px solid {tag_border};color:{tag_color};
-                    padding:4px 12px;border-radius:20px;font-size:0.68rem;font-weight:500;">Snowflake Native</span>
-                <span style="background:{tag_bg};border:1px solid {tag_border};color:{tag_color};
-                    padding:4px 12px;border-radius:20px;font-size:0.68rem;font-weight:500;">INSEE SIRENE 29M+</span>
-                <span style="background:{tag_bg};border:1px solid {tag_border};color:{tag_color};
-                    padding:4px 12px;border-radius:20px;font-size:0.68rem;font-weight:500;">E-facturation R01-R08</span>
-                <span style="background:{tag_bg};border:1px solid {tag_border};color:{tag_color};
-                    padding:4px 12px;border-radius:20px;font-size:0.68rem;font-weight:500;">Cortex Analyst</span>
-            </div>
-        </div>
-        """
+        </div>'''
         st.markdown(hero_html, unsafe_allow_html=True)
 
     # --- RIGHT: Login form ---
     with col_form:
-        # Demo badge
-        badge_bg = "rgba(2,132,199,0.08)" if is_dark else "rgba(3,105,161,0.06)"
-        badge_border = "rgba(2,132,199,0.3)" if is_dark else "rgba(3,105,161,0.2)"
-        st.markdown(
-            f'<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 14px;'
-            f'background:{badge_bg};border:1px solid {badge_border};border-radius:20px;'
-            f'font-size:0.68rem;font-weight:600;color:{accent};text-transform:uppercase;'
-            f'letter-spacing:0.08em;margin-bottom:1rem;">'
-            f'<span style="width:7px;height:7px;border-radius:50%;background:{accent};"></span>'
-            f' {t("login.badge.demo")}</div>',
-            unsafe_allow_html=True,
-        )
-
-        # Dynamic subtitle from session defaults
+        _lang = get_lang()
+        _badge_bg = "rgba(14,156,138,0.16)" if is_dark else "#E4F5F2"
+        _badge_text = "Environnement d\u00e9mo" if _lang == "fr" else "Demo environment"
+        _title_text = "Connexion Snowflake" if _lang == "fr" else "Snowflake Connection"
         _sub_user = st.session_state.get("sf_user", "SNOWADMIN")
         _sub_acct = st.session_state.get("sf_account", "SFSEEUROPE-TEST_DEMO_ACCOUNT_AS")
-        st.markdown(
-            f'<div style="font-size:1.05rem;font-weight:700;color:{text_h};margin-bottom:2px;">'
-            f'{t("login.form.title")}</div>'
-            f'<div style="font-size:0.78rem;color:{text_p};margin-bottom:0.8rem;">'
-            f'{_sub_user} · {_sub_acct}</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'''
+        <div style="display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;
+            letter-spacing:0.08em;text-transform:uppercase;color:#0B7D6F;
+            background:{_badge_bg};
+            padding:5px 11px;border-radius:20px;margin-bottom:12px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#16A34A;"></span>
+            {_badge_text}
+        </div>
+        <div style="font-size:22px;font-weight:700;color:{ink};margin-bottom:4px;">
+            {_title_text}
+        </div>
+        <div style="font-family:monospace;font-size:11.5px;color:{slate};margin-bottom:18px;">
+            {_sub_user} &middot; {_sub_acct}
+        </div>
+        ''', unsafe_allow_html=True)
 
-        # Auth method toggle
-        st.markdown(
-            f'<p style="font-size:0.75rem;font-weight:600;color:{text_h};margin-bottom:0.4rem;">'
-            f'{t("login.auth.label")}</p>',
-            unsafe_allow_html=True,
-        )
-        auth_options = [t("login.auth.password"), t("login.auth.sso")]
-        auth_choice = st.radio(
-            t("login.auth.label"), auth_options, index=0,
-            horizontal=True, key="login_auth_method", label_visibility="collapsed",
-        )
-        use_sso = auth_choice == t("login.auth.sso")
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+
+        auth_label = "Authentification" if _lang == "fr" else "Authentication"
+        auth_options = ["Mot de passe" if _lang == "fr" else "Password", "SSO (navigateur)" if _lang == "fr" else "SSO (browser)"]
+        auth_choice = st.radio(auth_label, auth_options, index=0, horizontal=True, key="login_auth_method")
+        use_sso = auth_choice == auth_options[1]
 
         with st.form("sf_login_form"):
             account = st.text_input(
-                t("login.field.account"),
+                "Compte" if _lang == "fr" else "Account",
                 value=st.session_state.get("sf_account", "SFSEEUROPE-TEST_DEMO_ACCOUNT_AS"),
-                placeholder="orgname-accountname",
             )
             user = st.text_input(
-                t("login.field.user"),
+                "Utilisateur" if _lang == "fr" else "User",
                 value=st.session_state.get("sf_user", "SNOWADMIN"),
-                placeholder="SNOWFLAKE_USER",
             )
             if not use_sso:
                 password = st.text_input(
-                    t("login.field.password"), type="password", placeholder="••••••••",
+                    "Mot de passe" if _lang == "fr" else "Password",
+                    type="password", value="",
                 )
             else:
                 password = ""
             c1, c2 = st.columns(2)
             with c1:
-                passcode = st.text_input(
-                    t("login.field.mfa"), placeholder=t("login.field.mfa_placeholder"),
-                )
+                passcode = st.text_input("MFA", placeholder="Optionnel" if _lang == "fr" else "Optional")
             with c2:
                 warehouse = st.text_input(
-                    t("login.field.warehouse"),
+                    "Warehouse",
                     value=st.session_state.get("sf_warehouse", "COMPUTE_WH"),
-                    placeholder="COMPUTE_WH",
                 )
             submitted = st.form_submit_button(
-                t("login.submit"),
+                "Se connecter \u00e0 L\u00e9on  \u203a" if _lang == "fr" else "Sign in to L\u00e9on  \u203a",
                 type="primary", use_container_width=True,
             )
 
-    # Footer
-    st.markdown(
-        f'<p style="text-align:center;font-size:0.72rem;color:{text_p};margin-top:1.5rem;">'
-        f'{t("login.caption")}</p>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div class="login-footer">{t("app.footer")}</div>',
-        unsafe_allow_html=True,
-    )
+        _footer_text = "Connexion s\u00e9curis\u00e9e \u00b7 aucune donn\u00e9e stock\u00e9e" if _lang == "fr" else "Secure connection \u00b7 no data stored"
+        st.markdown(f'''
+        <div style="text-align:center;font-size:11px;color:{slate};margin-top:14px;display:flex;
+            align-items:center;justify-content:center;gap:7px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{brand}" stroke-width="2">
+                <rect x="4.5" y="10" width="15" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            {_footer_text}
+        </div>
+        ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- Handle form submission ---
     if submitted:
         if not account.strip() or not user.strip():
             st.error(t("login.error.missing_fields"))
@@ -8146,7 +8531,6 @@ def page_login():
                         warehouse.strip() or "COMPUTE_WH", passcode.strip(), authenticator,
                     )
                     conn.cursor().execute("SELECT 1")
-                    # Detect current database & schema from the connection
                     try:
                         cur = conn.cursor()
                         cur.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA()")
@@ -8170,7 +8554,6 @@ def page_login():
                     st.rerun()
                 except Exception as exc:
                     st.error(t("login.error.failed", error=str(exc)))
-
 
 PAGE_RENDERERS = {
     "dashboard": page_dashboard,
